@@ -5,3 +5,5 @@ native program is more accurate in timings so it seems.
 compile with
 ./macoscompile.sh
 you'll need nasm for x86
+native platform is ARM M1, so you can add necessary switches to gas, that is target
+if you want to assemble for ARM.
