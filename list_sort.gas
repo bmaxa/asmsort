@@ -1,0 +1,592 @@
+.set	Node.next, 0
+.set	Node.data, 8
+NodeSize = 16
+    .text
+    .globl  _main                           
+    .align    4
+;       radix_sort_avx2
+;extern _atoi
+;extern _printf
+;extern _puts
+;extern _exit
+;extern _rand_r
+;extern _time
+;extern _malloc
+.macro stosq label,dest,val,len
+    mov x0,\dest
+    mov x1,\val
+    mov x2,\len
+\label:
+    str x1,[x0],8
+    subs x2,x2,1
+    bne \label
+.endm    
+_main:
+    sub sp,sp,#64
+    stp x29,x30,[sp,#48]
+    stp x19,x20,[sp,#32]
+    stp x21,x22,[sp,#16]
+    add x29,sp,#48
+    adrp x8, N@PAGE
+    mov w9,#4096*4096
+    str w9,[x8,N@PAGEOFF]
+	cmp x0, #1
+	beq .skip
+	ldr x0,[x1,#8]
+	bl _atoi
+    cmp w0,#1
+	blt .exit
+    adrp x8, N@PAGE
+	str w0,[x8,N@PAGEOFF]
+.align 8
+.skip:
+	mov x0,xzr
+	bl _time
+    adrp x8,seed@PAGE
+	str w0,[x8,seed@PAGEOFF] ; seed on time
+    str x0,[sp]
+    adrp x9,fmt1@PAGE
+	add x0,x9,fmt1@PAGEOFF
+	bl _printf ; print seed
+
+    adrp x9,fmt4@PAGE
+	add x0,x9,fmt4@PAGEOFF
+    adrp x8,N@PAGE
+    ldr w8,[x8,N@PAGEOFF]
+    str x8,[sp]
+	bl _printf
+    adrp x20,list1@PAGE
+	add x20,x20,list1@PAGEOFF
+	bl init_list
+    adrp x20,list2@PAGE
+	add x20,x20,list2@PAGEOFF
+	bl init_list
+    adrp x0,fmti@PAGE
+    add x0,x0,fmti@PAGEOFF
+    bl _puts
+
+    adrp x0,N@PAGE
+    ldr x0,[x0,N@PAGEOFF]
+    mov x1,#4
+    mov x2,xzr
+    mul x0,x0,x1
+	bl _malloc
+    adrp x8,array@PAGE
+	str x0, [x8,array@PAGEOFF]
+	
+    adrp x0,list2@PAGE
+    ldr x0,[x0,list2@PAGEOFF]
+    adrp x1,list1@PAGE
+    ldr x1,[x1,list1@PAGEOFF]
+	bl assign_list
+
+    adrp x0,array@PAGE
+    ldr x0,[x0,array@PAGEOFF]
+    adrp x1,list1@PAGE
+    ldr x1,[x1,list1@PAGEOFF]
+	bl assign_array
+
+    adrp x0,fmtu@PAGE
+    add x0,x0,fmtu@PAGEOFF
+    adrp x20,list1@PAGE
+    add x20,x20,list1@PAGEOFF
+	bl print_list
+;radix_avx2 equ 1
+.ifdef radix_avx2
+	call init_time
+	mov rdi,[array]
+	mov esi,[N]
+	call [radix_sort_avx2]
+	mov rdi,fmtar
+	call time_me
+.endif
+
+.if 1
+	bl init_time
+	adrp x20,list1@PAGE
+	add x20,x20,list1@PAGEOFF
+	bl radix_sort
+
+    adrp x0,fmtr@PAGE
+	add x0,x0,fmtr@PAGEOFF
+	bl  time_me
+.endif
+.if 1
+	bl init_time
+	adrp x0,list2@PAGE
+    ldr x0,[x0,list2@PAGEOFF]
+    sub sp,sp,32
+	str x0,[sp]
+	bl sort
+	adrp x0,list2@PAGE
+	ldr x1,[sp]
+	str x1,[x0,list2@PAGEOFF]
+    add sp,sp,32
+    adrp x0,fmtm@PAGE
+    add x0,x0,fmtm@PAGEOFF
+	bl time_me
+.endif
+    adrp x0,list1@PAGE
+    ldr x0,[x0,list1@PAGEOFF]
+    adrp x1,list2@PAGE
+    ldr x1,[x1,list2@PAGEOFF]
+	bl equal_list
+    adrp x8,fmte@PAGE
+    add x8,x8,fmte@PAGEOFF
+    adrp x9,fmtne@PAGE
+    add x9,x9,fmtne@PAGEOFF
+	cmp x2,#1
+    csel x0,x8,x9,eq
+	bl _puts
+/*	
+	mov rdi,[array]
+	mov rsi,[list2]
+	call equal_array
+	mov rdi,fmte
+	test eax,eax
+	mov rbx,fmtne
+	cmovz rdi,rbx
+	call _puts
+*/	
+    adrp x0,fmts@PAGE
+    add x0,x0,fmts@PAGEOFF
+    adrp x20,list1@PAGE
+    add x20,x20,list1@PAGEOFF
+	bl print_list
+    adrp x0,fmts@PAGE
+    add x0,x0,fmts@PAGEOFF
+    adrp x20,list2@PAGE
+    add x20,x20,list2@PAGEOFF
+	bl print_list
+    adrp x20,list1@PAGE
+    ldr x20,[x20,list1@PAGEOFF]
+	bl length
+	mov x8,x0
+	adrp x0,fmt3@PAGE
+    add x0,x0,fmt3@PAGEOFF
+	mov x9,NodeSize
+    str x9,[sp]
+    str x8,[sp,8]
+	bl _printf
+.exit:
+    ldp x29,x30,[sp,#48]
+    ldp x19,x20,[sp,#32]
+    ldp x21,x22,[sp,#16]
+    add sp,sp,#64
+    ret
+    .align 8
+init_list:
+    str x30,[sp]
+    adrp x19,N@PAGE
+    ldr w19,[x19,N@PAGEOFF]
+	;address of list in x20
+.L0:
+	mov x0,NodeSize
+    bl _malloc
+    ldr x8,[x20]
+	str x8,[x0,Node.next]
+	str x0,[x20]
+    adrp x0,seed@PAGE
+    add x0,x0,seed@PAGEOFF
+	bl _rand_r
+    ; x0 -> random value
+    ; divide by N, x8 -> N
+    adrp x8,N@PAGE
+    ldr w8,[x8,N@PAGEOFF]
+    
+    udiv    w2, w0, w8
+    msub    w0, w2, w8, w0
+
+    ldr  x8,[x20]
+    str w0, [x8,Node.data]
+
+	sub w19,w19,#1
+    cmp w19,wzr
+	bne .L0
+    ldr x30,[sp]
+	ret
+print_list:
+    str x30,[sp]
+    sub sp,sp,16
+	bl _puts
+    ldr x20,[x20]
+    ;x20 -> list address
+	mov x19,#16
+.L01:
+    cmp x20,xzr
+	beq .exit1
+    adrp x0,fmt2@PAGE
+    add x0,x0,fmt2@PAGEOFF
+    mov x8,x20
+    ldr x8,[x8,Node.next]
+    str x8,[sp]
+    mov x9,x20
+    ldr w9,[x9,Node.data]
+    str x9,[sp,8]
+	bl _printf
+	ldr x20,[x20,Node.next]
+	sub x19,x19,1
+    cmp x19,xzr
+	beq .exit1
+	b .L01
+.exit1:
+    add sp,sp,16
+    ldr x30,[sp]
+	ret
+assign_list:
+.L02:
+	cmp x1,xzr
+	beq .exit2
+	cmp x0,xzr
+	beq .exit2
+    ldr w8,[x1,Node.data]
+	str w8, [x0,Node.data]
+    ldr x1,[x1,Node.next]
+    ldr x0,[x0,Node.next]
+	b .L02
+.exit2:
+	ret
+assign_array:
+.L03:
+	cmp x1,xzr
+	beq .exit3
+    ldr w8,[x1,Node.data]
+	str w8, [x0]
+    ldr x1,[x1,Node.next]
+	add x0,x0,#4
+	b .L03
+.exit3:
+	ret
+equal_list:
+    str x30,[sp,-16]!
+    mov x2,#1 ; return value if true
+    mov x20,x0
+    mov x3,x0
+    bl length
+    mov x4,x0
+    mov x20,x1
+    bl length
+    mov x5,x0
+    ldr x30,[sp],16
+    cmp x4,x5
+    bne .false
+    mov x0,x3
+.L04:
+	cmp x1,xzr
+	beq .exit4
+	cmp x0,xzr
+	beq .exit4
+    ldr w8,[x1,Node.data]
+    ldr w9,[x0,Node.data]
+	cmp w8,w9
+	bne .false
+    ldr x1,[x1,Node.next]
+    ldr x0,[x0,Node.next]
+	b .L04
+.exit4:
+	ret
+.false:
+	mov x2,xzr
+	ret
+equal_array:
+	mov x2,#1 ; return value if true
+.L05:
+	cmp x1,xzr
+	beq .exit5
+    ldr w8,[x1,Node.data]
+    ldr w9,[x0]
+	cmp w8,w9
+	bne .false1
+    ldr x1,[x1,Node.next]
+	add x0,x0,#4
+	b .L05
+.exit5:
+	ret
+.false1:
+	mov x2,xzr
+	ret
+; [sp] list to sort
+sort:
+    sub sp,sp,32
+    str x30,[sp,16]
+    ldr x20,[sp,32]
+	bl length
+    mov x11,x0
+    cmp x11,#1
+	ble .exitsort
+    lsr x11,x11,#1
+    str xzr,[sp]
+    str xzr,[sp,8]
+    ldr x1,[sp,#32]
+.L0sort: ; append to left
+    ldr x19,[sp]
+    ldr x10,[x1,Node.next]
+    str x19,[x1,Node.next]
+    str x1,[sp]
+    mov x1,x10
+    subs x11,x11,#1
+	bgt .L0sort
+.L1sort: ; append to right
+    ldr x19,[sp,8]
+    ldr x10,[x1,Node.next]
+    str x19,[x1,Node.next]
+    str x1,[sp,8]
+    ldr x1,[x1,Node.next]
+    mov x1,x10
+    cmp x1,xzr
+	bne .L1sort
+    sub sp,sp,16
+    ldr x1,[sp,16]
+    str x1,[sp]
+	bl sort
+    ldr x1,[sp]
+	str x1,[sp,16]
+    ldr x1,[sp,24]
+    str x1,[sp]
+	bl sort
+    ldr x1,[sp]
+    str x1,[sp,24]
+	bl merge
+    ldr x1,[sp]
+    add sp,sp,#16
+    str x1,[sp,32]
+.exitsort:
+    ldr x30,[sp,16]
+    add sp,sp,32
+	ret
+; [rsp] output , [rsp+16] left, [rsp+24] right
+merge:
+    sub sp,sp,16
+    str xzr,[sp,16]
+    str xzr,[sp]
+.L0merge:
+    ldr x0,[sp,32]
+    cmp x0,xzr
+    beq .right
+    ldr x0,[sp,40]
+    cmp x0,xzr
+	beq .left
+    ldr x19,[sp,32]
+    ldr w1,[x19,Node.data]
+    ldr x11,[sp,40]
+    ldr w0,[x11,Node.data]
+    cmp w1,w0
+	blt .add_left
+.add_right:
+    ldr x0,[sp]
+    cmp x0,xzr
+	beq .just_set_right
+    ldr x10,[sp]
+    str x11,[x10,Node.next]
+    ldr x10,[x11,Node.next]
+    str x10,[sp,40]
+    str xzr,[x11,Node.next]
+    str x11,[sp]
+	b .L0merge
+.add_left:
+    ldr x0,[sp]
+    cmp x0,xzr
+    beq .just_set_left
+    ldr x10,[sp]
+    str x19,[x10,Node.next]
+    ldr x10,[x19,Node.next]
+    str x10,[sp,32]
+    str xzr,[x19,Node.next]
+    str x19,[sp]
+	b .L0merge
+.just_set_left:
+    ldr x10,[x19,Node.next]
+    str xzr,[x19,Node.next]
+    str x19,[sp]
+    str x19,[sp,16]
+    str x10,[sp,32]
+	b .L0merge
+.just_set_right:
+    ldr x10,[x11,Node.next]
+    str xzr,[x11,Node.next]
+    str x11,[sp]
+    str x11,[sp,16]
+    str x10,[sp,40]
+	b .L0merge
+.right:
+    ldr x0,[sp,40]
+    cmp x0,xzr
+	beq .exitmerge
+    ldr x11,[sp,40]
+    ldr x0,[sp]
+    cmp x0,xzr
+	beq .just_set_right_only
+    ldr x10,[sp]
+    str x11,[x10,Node.next]
+    str x11,[sp]
+    ldr x10,[x11,Node.next]
+    str xzr,[x11,Node.next]
+    str x10,[sp,40]
+	b .right
+.just_set_right_only:
+    ldr x10,[x11,Node.next]
+    str xzr,[x11,Node.next]
+    str x11,[sp]
+    str x11,[sp,16]
+    str x10,[sp,40]
+	b .right
+.left:
+    ldr x0,[sp,32]
+    cmp x0,xzr
+	beq .exitmerge
+    ldr x19,[sp,32]
+    ldr x0,[sp]
+    cmp x0,xzr
+	beq .just_set_left_only
+    ldr x10,[sp]
+    str x19,[x10,Node.next]
+    str x19,[sp]
+    ldr x10,[x19,Node.next]
+    str xzr,[x19,Node.next]
+    str x10,[sp,32]
+	b .left
+.just_set_left_only:
+    ldr x10,[x19,Node.next]
+    str xzr,[x19,Node.next]
+    str x19,[sp]
+    str x19,[sp,32]
+    str x10,[sp,40]
+	b .left
+.exitmerge:
+    add sp,sp,16
+	ret
+; x20 input list, x0 count
+length:
+	mov x0,xzr
+.L0L:
+    cmp x20,xzr
+	beq .exitL
+    ldr x20,[x20,Node.next]
+	add x0,x0,#1
+	b .L0L
+.exitL:
+	ret
+; [x20] list to sort
+radix_sort:
+    sub sp,sp,#32*8
+    mov w9,wzr
+.L0rad:
+    stosq .L0S,sp,#0,#32
+    ldr x8,[x20]
+.L1rad:
+	cmp x8,xzr
+	beq .nextrad
+	mov w10,w9
+	lsl w10,w10,#2
+	ldr w11,[x8,Node.data]
+	lsr w11,w11,w10
+	and w11,w11,#0x0f
+    ldr x12,[sp,x11, lsl 3]
+    cmp x12,xzr
+    beq .just_set
+	ldr x13,[x8,Node.next]
+    add x11,x11,#16
+    ldr x0,[sp,x11,lsl 3]
+    str x8,[x0,Node.next]
+    str x8,[sp,x11,lsl 3]
+    sub x11,x11,#16
+    str xzr,[x8,Node.next]
+	mov x8,x13
+	b .L1rad
+.just_set:
+    ldr x13,[x8,Node.next]
+    str x8,[sp,x11,lsl 3]
+    add x11,x11,16
+    str x8,[sp,x11,lsl 3]
+    sub x11,x11,16
+    str xzr,[x8,Node.next]
+	mov x8,x13
+	b .L1rad
+.nextrad:
+    str	xzr,[x20]
+    mov x8,xzr
+    mov x10,xzr
+.L2rad:
+    ldr x11,[sp,x10, lsl 3]
+.L3rad:
+    cmp x11,xzr
+	beq .next1rad
+    cmp x8,xzr
+	beq .just_set1
+    str x11,[x8,Node.next]
+    mov x8,x11
+    ldr x13,[x11,Node.next]
+    str xzr,[x11,Node.next]
+    mov x11,x13
+	b .L3rad
+.just_set1:
+    mov x8,x11
+    str x11,[x20]
+    ldr x13,[x11,Node.next]
+    str xzr,[x11,Node.next]
+    mov x11,x13
+	b .L3rad
+.next1rad:
+    add x10,x10,#1
+    cmp x10,#16
+	blt .L2rad
+    add x9,x9,#1
+	cmp x9,#8
+	blt .L0rad
+.exitrad:
+	add sp,sp,#32*8	
+	ret
+init_time:
+    mrs x0,CNTPCT_EL0 ; counter
+    adrp x8,elapsed@PAGE
+	str x0, [x8,elapsed@PAGEOFF]
+	ret
+time_me:
+    mrs x8,cntfrq_el0 ; clock
+    ucvtf d1,x8
+    mrs x8,CNTPCT_EL0 ; counter
+    adrp x9,elapsed@PAGE
+    ldr x9,[x9,elapsed@PAGEOFF]
+    sub x8,x8,x9
+    ucvtf d0,x8
+	fdiv d0,d0,d1
+    str d0,[sp]
+	b _printf
+.data
+.align 8
+fmtpi: .asciz "pointer %p\n"
+.align 8
+fmti: .asciz "initialized\n"
+.align 8
+fmtu: .asciz "unsorted\n"
+.align 8 
+fmts: .asciz "sorted\n"
+.align 8
+fmte: .asciz "equal\n"
+.align 8
+fmtne: .asciz "not equal\n"
+.align 8
+fmtm: .asciz "list merge elapsed %f seconds\n"
+.align 8
+fmtr: .asciz "list radix elapsed %f seconds\n"
+.align 8
+fmtari: .asciz "array radix elapsed %f seconds"
+.align 8
+fmt1: .asciz "seed: %d\n"
+.align 8
+fmt2: .asciz "%16p %d\n"
+.align 8
+fmt3: .asciz "size of node %d, length %d\n"
+.align 8
+fmt4: .asciz "N: %d\n"
+.bss 
+.align 8
+list1: .space 8
+list2: .space 8
+array: .space 8
+elapsed: .space 8
+.align 8
+N: .space 4; number of nodes
+.align 8
+seed: .space 4
+
