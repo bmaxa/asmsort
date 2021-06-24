@@ -1,0 +1,7 @@
+list sort in assembly.
+radix and merge.
+seems that tsc is not accurate on M1,
+native program is more accurate in timings so it seems.
+compile with
+./macoscompile.sh
+you'll need nasm for x86
