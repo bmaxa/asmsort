@@ -1,4 +1,4 @@
-//format elf64 executable 3 at 0x100000000
+format elf64 executable 3 at 0x100000000
 struc Node {
 	.next dq ?
 	.data dd ?
@@ -7,9 +7,12 @@ struc Node {
 virtual at 0
 	n Node
 end virtual
+include 'import64.inc'
+interpreter '/lib64/ld-linux-x86-64.so.2'
+needed 'libc.so.6','./libspeedupavx2.so'
 
-;import atoi,printf,puts,exit,rand_r,time,malloc, \
-;       radix_sort_avx2
+import atoi,printf,puts,exit,rand_r,time,malloc, \
+       radix_sort_avx2
 
 segment executable
 entry $
@@ -47,7 +50,7 @@ entry $
 	imul rdi,4
 	call [malloc]
 	mov [array],rax
-	
+
 	mov rdi,[list2]
 	mov rsi,[list1]
 	call assign_list
@@ -74,7 +77,7 @@ end if
 if 1
 	call init_time
 	mov rbx,[list1]
-	push rbx 
+	push rbx
 	call radix_sort
 	pop rbx
 	mov [list1],rbx
@@ -85,13 +88,13 @@ end if
 if 1
 	call init_time
 	mov rbx,[list2]
-	push rbx 
+	push rbx
 	call sort
 	pop rbx
 	mov [list2],rbx
 	mov rdi,fmtm
 	call time_me
-end if	
+end if
 	mov rdi,[list1]
 	mov rsi,[list2]
 	call equal_list
@@ -100,7 +103,7 @@ end if
 	mov rbx,fmtne
 	cmovz rdi,rbx
 	call [puts]
-	
+
 	mov rdi,[array]
 	mov rsi,[list2]
 	call equal_array
@@ -109,7 +112,7 @@ end if
 	mov rbx,fmtne
 	cmovz rdi,rbx
 	call [puts]
-	
+
 	mov rdi,fmts
 	mov rbx,list1
 	push rbx
@@ -252,7 +255,7 @@ sort:
 	mov [rsp+8],rbx
 	mov rbx,[rbx+n.next]
 	mov rbx,rdx
-	test rbx,rbx 
+	test rbx,rbx
 	jnz .L1
 	sub rsp,8 ; result
 	mov rbx,[rsp+8]
@@ -260,7 +263,7 @@ sort:
 	call sort
 	mov rbx,[rsp]
 	mov [rsp+8],rbx
-	
+
 	mov rbx,[rsp+16]
 	mov [rsp],rbx
 	call sort
@@ -441,12 +444,12 @@ radix_sort:
 	cmp rbx,8
 	jl .L0
 .exit:
-	add rsp,32*8	
+	add rsp,32*8
 	ret
 init_time:
 	rdtscp
 	shl rdx,32
-	or rax,rdx 
+	or rax,rdx
 	mov [elapsed],rax
 	ret
 time_me:
@@ -458,7 +461,7 @@ time_me:
 	divsd xmm0,[clock]
 	mov rax,1
 	jmp [printf]
-	
+
 segment readable
 clock dq 3.8e9
 fmtu db 'unsorted',0ah,0
