@@ -1,5 +1,5 @@
 default rel
-struc Node 
+struc Node
 	.next resq 1
 	.data resd 1
 endstruc
@@ -56,7 +56,7 @@ _main:
 	imul rdi,4
 	call _malloc
 	mov [array],rax
-	
+
 	mov rdi,[list2]
 	mov rsi,[list1]
 	call assign_list
@@ -83,7 +83,7 @@ _main:
 %if 1
 	call init_time
 	mov rbx,[list1]
-	push rbx 
+	push rbx
 	call radix_sort
 	pop rbx
 	mov [list1],rbx
@@ -94,13 +94,13 @@ _main:
 %if 1
 	call init_time
 	mov rbx,[list2]
-	push rbx 
+	push rbx
 	call sort
 	pop rbx
 	mov [list2],rbx
 	mov rdi,fmtm
 	call time_me
-%endif	
+%endif
 	mov rdi,[list1]
 	mov rsi,[list2]
 	call equal_list
@@ -109,7 +109,7 @@ _main:
 	mov rbx,fmtne
 	cmovz rdi,rbx
 	call _puts
-	
+
 	mov rdi,[array]
 	mov rsi,[list2]
 	call equal_array
@@ -118,7 +118,7 @@ _main:
 	mov rbx,fmtne
 	cmovz rdi,rbx
 	call _puts
-	
+
 	mov rdi,fmts
 	mov rbx,list1
 	push rbx
@@ -140,7 +140,7 @@ _main:
 	add rsp,8
     pop rbp
     pop rbx
-    ret 
+    ret
 init_list:
 	mov ebx,[N]
 	mov r12,[rsp+8]
@@ -272,7 +272,7 @@ sort:
 	mov [rsp+8],rbx
 	mov rbx,[rbx+Node.next]
 	mov rbx,rdx
-	test rbx,rbx 
+	test rbx,rbx
 	jnz .L1
 	sub rsp,8 ; result
 	mov rbx,[rsp+8]
@@ -280,7 +280,7 @@ sort:
 	call sort
 	mov rbx,[rsp]
 	mov [rsp+8],rbx
-	
+
 	mov rbx,[rsp+16]
 	mov [rsp],rbx
 	call sort
@@ -461,12 +461,12 @@ radix_sort:
 	cmp rbx,8
 	jl .L0
 .exit:
-	add rsp,32*8	
+	add rsp,32*8
 	ret
 init_time:
 	rdtscp
 	shl rdx,32
-	or rax,rdx 
+	or rax,rdx
 	mov [elapsed],rax
 	ret
 time_me:
@@ -478,9 +478,9 @@ time_me:
 	divsd xmm0,[clock]
 	mov rax,1
 	jmp _printf
-	
+
 section .data
-clock dq 3.8e9
+clock dq 3.2e9
 fmtp db 'pointer %p',0ah,0
 fmti db 'initialized',0ah,0
 fmtu db 'unsorted',0ah,0
